@@ -28,7 +28,7 @@ function isFree() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { question, filters } = await req.json();
+    const { question, filters, groupUuid, excludeAgentIds } = await req.json();
     if (!question) {
       return NextResponse.json({ error: "question required" }, { status: 400 });
     }
@@ -43,12 +43,47 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Paid tier — recruit → study → question
+    // Paid tier with pre-recruited group
+    if (groupUuid) {
+      // Remove excluded agents before asking
+      if (excludeAgentIds?.length) {
+        await ditto(
+          "POST",
+          `/v1/research-groups/${groupUuid}/agents/remove`,
+          { agent_ids: excludeAgentIds }
+        );
+      }
+
+      const study = await ditto("POST", "/v1/research-studies", {
+        title: question.slice(0, 80),
+        objective: question,
+        shareable: true,
+        research_group_uuid: groupUuid,
+      });
+
+      const studyId = study.study?.id;
+      if (!studyId) throw new Error("No study ID");
+
+      const qResp = await ditto(
+        "POST",
+        `/v1/research-studies/${studyId}/questions`,
+        { question }
+      );
+
+      return NextResponse.json({
+        tier: "paid",
+        jobIds: qResp.job_ids,
+        studyId,
+        total: qResp.job_ids?.length ?? 0,
+      });
+    }
+
+    // Paid tier — legacy path (recruit + ask in one shot)
     const size = filters?.size ?? 10;
     const groupFilters: Record<string, unknown> = { country: "USA" };
     if (filters?.ageMin) groupFilters.age_min = filters.ageMin;
     if (filters?.ageMax) groupFilters.age_max = filters.ageMax;
-    if (filters?.gender) groupFilters.sex = filters.gender;
+    if (filters?.gender) groupFilters.is_female = filters.gender === "Female";
     if (filters?.state) groupFilters.state = filters.state.toUpperCase();
     if (filters?.city) groupFilters.city = filters.city;
 
@@ -58,14 +93,14 @@ export async function POST(req: NextRequest) {
       filters: groupFilters,
     });
 
-    const groupUuid = group.group?.uuid;
-    if (!groupUuid) throw new Error("No group UUID");
+    const recruiterGroupUuid = group.group?.uuid;
+    if (!recruiterGroupUuid) throw new Error("No group UUID");
 
     const study = await ditto("POST", "/v1/research-studies", {
       title: question.slice(0, 80),
       objective: question,
       shareable: true,
-      research_group_uuid: groupUuid,
+      research_group_uuid: recruiterGroupUuid,
     });
 
     const studyId = study.study?.id;

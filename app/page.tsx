@@ -63,9 +63,7 @@ export default function Home() {
     description: "",
   });
 
-  const [mediaAssetId, setMediaAssetId] = useState<string | null>(null);
-  const [attachmentName, setAttachmentName] = useState("");
-  const [attachmentPreview, setAttachmentPreview] = useState("");
+  const [attachments, setAttachments] = useState<{ id: string; name: string; preview: string }[]>([]);
   const [uploading, setUploading] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -105,6 +103,8 @@ export default function Home() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Reset input so same file can be re-selected
+    e.target.value = "";
 
     if (file.size > 10 * 1024 * 1024) {
       setError("File too large (max 10MB)");
@@ -122,15 +122,8 @@ export default function Home() {
         reader.readAsDataURL(file);
       });
 
-      // Show preview
-      if (file.type.startsWith("image/")) {
-        setAttachmentPreview(dataUrl);
-      } else {
-        setAttachmentPreview("pdf");
-      }
-      setAttachmentName(file.name);
+      const preview = file.type.startsWith("image/") ? dataUrl : "pdf";
 
-      // Upload to Ditto
       const res = await fetch("/api/upload", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -140,24 +133,18 @@ export default function Home() {
       const data = await res.json();
       if (data.error) {
         setError(data.error);
-        setAttachmentPreview("");
-        setAttachmentName("");
       } else {
-        setMediaAssetId(data.mediaAssetId);
+        setAttachments(prev => [...prev, { id: data.mediaAssetId, name: file.name, preview }]);
       }
     } catch {
       setError("Upload failed");
-      setAttachmentPreview("");
-      setAttachmentName("");
     } finally {
       setUploading(false);
     }
   };
 
-  const removeAttachment = () => {
-    setMediaAssetId(null);
-    setAttachmentName("");
-    setAttachmentPreview("");
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
   };
 
   const usernameRef = useRef(username);
@@ -345,7 +332,7 @@ export default function Home() {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, groupUuid, excludeAgentIds, attachments: mediaAssetId ? [mediaAssetId] : undefined }),
+        body: JSON.stringify({ question, groupUuid, excludeAgentIds, attachments: attachments.length ? attachments.map(a => a.id) : undefined }),
       });
 
       const data = await res.json();
@@ -421,9 +408,7 @@ export default function Home() {
     setError("");
     setLoading(false);
     setPollProgress({ responded: 0, total: 0 });
-    setMediaAssetId(null);
-    setAttachmentName("");
-    setAttachmentPreview("");
+    setAttachments([]);
   };
 
   const togglePersona = (id: number) => {
@@ -653,37 +638,36 @@ export default function Home() {
             disabled={loading}
           />
 
-          <div className="mt-3">
-            {!attachmentName ? (
-              <label className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 cursor-pointer">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-                {uploading ? "Uploading..." : "Attach image or PDF"}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
-                  onChange={handleFileUpload}
-                  disabled={uploading || loading}
-                />
-              </label>
-            ) : (
-              <div className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
-                {attachmentPreview === "pdf" ? (
+          <div className="mt-3 space-y-2">
+            {attachments.map(a => (
+              <div key={a.id} className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
+                {a.preview === "pdf" ? (
                   <div className="w-12 h-12 bg-red-900 rounded flex items-center justify-center text-xs font-bold text-red-300">PDF</div>
                 ) : (
-                  <img src={attachmentPreview} alt="attachment" className="w-12 h-12 object-cover rounded" />
+                  <img src={a.preview} alt="attachment" className="w-12 h-12 object-cover rounded" />
                 )}
-                <span className="text-sm text-gray-300 flex-1 truncate">{attachmentName}</span>
+                <span className="text-sm text-gray-300 flex-1 truncate">{a.name}</span>
                 <button
-                  onClick={removeAttachment}
+                  onClick={() => removeAttachment(a.id)}
                   className="text-sm text-gray-500 hover:text-red-400"
                 >
                   Remove
                 </button>
               </div>
-            )}
+            ))}
+            <label className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 cursor-pointer">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              {uploading ? "Uploading..." : "Attach image or PDF"}
+              <input
+                type="file"
+                className="hidden"
+                accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
+                onChange={handleFileUpload}
+                disabled={uploading || loading}
+              />
+            </label>
           </div>
         </>
       )}
@@ -764,37 +748,36 @@ export default function Home() {
             disabled={loading}
           />
 
-          <div className="mt-3">
-            {!attachmentName ? (
-              <label className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 cursor-pointer">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                </svg>
-                {uploading ? "Uploading..." : "Attach image or PDF"}
-                <input
-                  type="file"
-                  className="hidden"
-                  accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
-                  onChange={handleFileUpload}
-                  disabled={uploading || loading}
-                />
-              </label>
-            ) : (
-              <div className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
-                {attachmentPreview === "pdf" ? (
+          <div className="mt-3 space-y-2">
+            {attachments.map(a => (
+              <div key={a.id} className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
+                {a.preview === "pdf" ? (
                   <div className="w-12 h-12 bg-red-900 rounded flex items-center justify-center text-xs font-bold text-red-300">PDF</div>
                 ) : (
-                  <img src={attachmentPreview} alt="attachment" className="w-12 h-12 object-cover rounded" />
+                  <img src={a.preview} alt="attachment" className="w-12 h-12 object-cover rounded" />
                 )}
-                <span className="text-sm text-gray-300 flex-1 truncate">{attachmentName}</span>
+                <span className="text-sm text-gray-300 flex-1 truncate">{a.name}</span>
                 <button
-                  onClick={removeAttachment}
+                  onClick={() => removeAttachment(a.id)}
                   className="text-sm text-gray-500 hover:text-red-400"
                 >
                   Remove
                 </button>
               </div>
-            )}
+            ))}
+            <label className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 cursor-pointer">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+              </svg>
+              {uploading ? "Uploading..." : "Attach image or PDF"}
+              <input
+                type="file"
+                className="hidden"
+                accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
+                onChange={handleFileUpload}
+                disabled={uploading || loading}
+              />
+            </label>
           </div>
 
           <button

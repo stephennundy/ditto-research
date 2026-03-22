@@ -98,14 +98,10 @@ export default function Home() {
   })();
 
   useEffect(() => {
-    const cookie = document.cookie
-      .split("; ")
-      .find((c) => c.startsWith("alaric_session="));
-    if (cookie) {
-      const value = decodeURIComponent(cookie.split("=")[1]);
-      const name = value.split(":")[0];
-      if (name) setUsername(name);
-    }
+    fetch("/api/auth")
+      .then(r => r.json())
+      .then(data => { if (data.username) setUsername(data.username); })
+      .catch(() => {});
   }, []);
 
   const handleLogout = async () => {

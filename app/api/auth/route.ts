@@ -45,6 +45,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
+export async function GET(req: NextRequest) {
+  const token = req.cookies.get("alaric_session")?.value;
+  if (!token) return NextResponse.json({ username: null });
+  const username = token.split(":")[0];
+  return NextResponse.json({ username: username || null });
+}
+
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
   res.cookies.set("alaric_session", "", {

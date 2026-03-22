@@ -97,10 +97,17 @@ export default function Home() {
     return parts.length ? parts.join(" | ") : "No filters";
   })();
 
+  const usernameRef = useRef(username);
+
   useEffect(() => {
     fetch("/api/auth")
       .then(r => r.json())
-      .then(data => { if (data.username) setUsername(data.username); })
+      .then(data => {
+        if (data.username) {
+          setUsername(data.username);
+          usernameRef.current = data.username;
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -108,8 +115,6 @@ export default function Home() {
     await fetch("/api/auth", { method: "DELETE" });
     router.push("/login");
   };
-
-  const usernameRef = useRef(username);
   const questionRef = useRef(question);
   const filterSummaryRef = useRef(filterSummary);
   useEffect(() => { usernameRef.current = username; }, [username]);

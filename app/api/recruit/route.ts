@@ -17,7 +17,13 @@ async function ditto(method: string, path: string, body?: object) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Ditto API ${res.status}: ${text}`);
+    // Try to extract JSON error message, fall back to status code
+    try {
+      const json = JSON.parse(text);
+      throw new Error(json.error?.message || `Ditto API error ${res.status}`);
+    } catch {
+      throw new Error(`Ditto API error ${res.status} — please try again`);
+    }
   }
   return res.json();
 }
@@ -35,6 +41,18 @@ export async function POST(req: NextRequest) {
     }
     if (filters?.state) groupFilters.state = filters.state.toUpperCase();
     if (filters?.city) groupFilters.city = filters.city;
+    if (filters?.incomeMin || filters?.incomeMax) {
+      groupFilters.income_annual_usd = {};
+      if (filters.incomeMin) (groupFilters.income_annual_usd as Record<string, number>).min = filters.incomeMin;
+      if (filters.incomeMax) (groupFilters.income_annual_usd as Record<string, number>).max = filters.incomeMax;
+    }
+    if (filters?.ethnicity) groupFilters.ethnicity = [filters.ethnicity];
+    if (filters?.industry) groupFilters.industry = [filters.industry];
+    if (filters?.isParent !== undefined && filters?.isParent !== null) groupFilters.is_parent = filters.isParent;
+    if (filters?.religion) groupFilters.religion = [filters.religion];
+    if (filters?.labourStatus) groupFilters.labour_status = [filters.labourStatus];
+    if (filters?.occupation) groupFilters.occupation = [filters.occupation];
+    if (filters?.description) groupFilters.description = filters.description;
 
     const group = await ditto("POST", "/v1/research-groups/recruit", {
       name: `Web ${new Date().toISOString().slice(0, 16)}`,

@@ -17,7 +17,12 @@ async function ditto(method: string, path: string, body?: object) {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Ditto API ${res.status}: ${text}`);
+    try {
+      const json = JSON.parse(text);
+      throw new Error(json.error?.message || `Ditto API error ${res.status}`);
+    } catch {
+      throw new Error(`Ditto API error ${res.status} — please try again`);
+    }
   }
   return res.json();
 }

@@ -63,7 +63,7 @@ export default function Home() {
     description: "",
   });
 
-  const [mediaAssetId, setMediaAssetId] = useState<number | null>(null);
+  const [mediaAssetId, setMediaAssetId] = useState<string | null>(null);
   const [attachmentName, setAttachmentName] = useState("");
   const [attachmentPreview, setAttachmentPreview] = useState("");
   const [uploading, setUploading] = useState(false);

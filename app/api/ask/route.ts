@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       if (!studyId) throw new Error("No study ID");
 
       const questionBody: Record<string, unknown> = { question };
-      if (attachments?.length) questionBody.attachments = attachments;
+      if (attachments?.length) questionBody.attachments = attachments.map((id: string) => ({ media_asset_id: id }));
 
       const qResp = await ditto(
         "POST",
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
     if (!studyId) throw new Error("No study ID");
 
     const legacyQuestionBody: Record<string, unknown> = { question };
-    if (attachments?.length) legacyQuestionBody.attachments = attachments;
+    if (attachments?.length) legacyQuestionBody.attachments = attachments.map((id: string) => ({ media_asset_id: id }));
 
     const qResp = await ditto(
       "POST",

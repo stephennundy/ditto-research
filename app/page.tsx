@@ -652,6 +652,39 @@ export default function Home() {
             onChange={(e) => setQuestion(e.target.value)}
             disabled={loading}
           />
+
+          <div className="mt-3">
+            {!attachmentName ? (
+              <label className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 cursor-pointer">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+                {uploading ? "Uploading..." : "Attach image or PDF"}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
+                  onChange={handleFileUpload}
+                  disabled={uploading || loading}
+                />
+              </label>
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
+                {attachmentPreview === "pdf" ? (
+                  <div className="w-12 h-12 bg-red-900 rounded flex items-center justify-center text-xs font-bold text-red-300">PDF</div>
+                ) : (
+                  <img src={attachmentPreview} alt="attachment" className="w-12 h-12 object-cover rounded" />
+                )}
+                <span className="text-sm text-gray-300 flex-1 truncate">{attachmentName}</span>
+                <button
+                  onClick={removeAttachment}
+                  className="text-sm text-gray-500 hover:text-red-400"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
         </>
       )}
 

@@ -33,7 +33,7 @@ function isFree() {
 
 export async function POST(req: NextRequest) {
   try {
-    const { question, filters, groupUuid, excludeAgentIds } = await req.json();
+    const { question, filters, groupUuid, excludeAgentIds, attachments } = await req.json();
     if (!question) {
       return NextResponse.json({ error: "question required" }, { status: 400 });
     }
@@ -69,10 +69,13 @@ export async function POST(req: NextRequest) {
       const studyId = study.study?.id;
       if (!studyId) throw new Error("No study ID");
 
+      const questionBody: Record<string, unknown> = { question };
+      if (attachments?.length) questionBody.attachments = attachments;
+
       const qResp = await ditto(
         "POST",
         `/v1/research-studies/${studyId}/questions`,
-        { question }
+        questionBody
       );
 
       return NextResponse.json({
@@ -111,10 +114,13 @@ export async function POST(req: NextRequest) {
     const studyId = study.study?.id;
     if (!studyId) throw new Error("No study ID");
 
+    const legacyQuestionBody: Record<string, unknown> = { question };
+    if (attachments?.length) legacyQuestionBody.attachments = attachments;
+
     const qResp = await ditto(
       "POST",
       `/v1/research-studies/${studyId}/questions`,
-      { question }
+      legacyQuestionBody
     );
 
     return NextResponse.json({

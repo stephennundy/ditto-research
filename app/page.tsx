@@ -63,6 +63,11 @@ export default function Home() {
     description: "",
   });
 
+  const [mediaAssetId, setMediaAssetId] = useState<number | null>(null);
+  const [attachmentName, setAttachmentName] = useState("");
+  const [attachmentPreview, setAttachmentPreview] = useState("");
+  const [uploading, setUploading] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("");
   const [results, setResults] = useState<ResultPersona[]>([]);
@@ -96,6 +101,64 @@ export default function Home() {
     if (filters.size) parts.push(`Group size: ${filters.size}`);
     return parts.length ? parts.join(" | ") : "No filters";
   })();
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File too large (max 10MB)");
+      return;
+    }
+
+    setUploading(true);
+    setError("");
+
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Show preview
+      if (file.type.startsWith("image/")) {
+        setAttachmentPreview(dataUrl);
+      } else {
+        setAttachmentPreview("pdf");
+      }
+      setAttachmentName(file.name);
+
+      // Upload to Ditto
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileData: dataUrl, filename: file.name }),
+      });
+
+      const data = await res.json();
+      if (data.error) {
+        setError(data.error);
+        setAttachmentPreview("");
+        setAttachmentName("");
+      } else {
+        setMediaAssetId(data.mediaAssetId);
+      }
+    } catch {
+      setError("Upload failed");
+      setAttachmentPreview("");
+      setAttachmentName("");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeAttachment = () => {
+    setMediaAssetId(null);
+    setAttachmentName("");
+    setAttachmentPreview("");
+  };
 
   const usernameRef = useRef(username);
 
@@ -282,7 +345,7 @@ export default function Home() {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, groupUuid, excludeAgentIds }),
+        body: JSON.stringify({ question, groupUuid, excludeAgentIds, attachments: mediaAssetId ? [mediaAssetId] : undefined }),
       });
 
       const data = await res.json();
@@ -358,6 +421,9 @@ export default function Home() {
     setError("");
     setLoading(false);
     setPollProgress({ responded: 0, total: 0 });
+    setMediaAssetId(null);
+    setAttachmentName("");
+    setAttachmentPreview("");
   };
 
   const togglePersona = (id: number) => {
@@ -664,6 +730,39 @@ export default function Home() {
             onChange={(e) => setQuestion(e.target.value)}
             disabled={loading}
           />
+
+          <div className="mt-3">
+            {!attachmentName ? (
+              <label className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-200 cursor-pointer">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                </svg>
+                {uploading ? "Uploading..." : "Attach image or PDF"}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/png,image/jpeg,image/gif,image/webp,application/pdf"
+                  onChange={handleFileUpload}
+                  disabled={uploading || loading}
+                />
+              </label>
+            ) : (
+              <div className="flex items-center gap-3 p-3 bg-gray-900 border border-gray-800 rounded-lg">
+                {attachmentPreview === "pdf" ? (
+                  <div className="w-12 h-12 bg-red-900 rounded flex items-center justify-center text-xs font-bold text-red-300">PDF</div>
+                ) : (
+                  <img src={attachmentPreview} alt="attachment" className="w-12 h-12 object-cover rounded" />
+                )}
+                <span className="text-sm text-gray-300 flex-1 truncate">{attachmentName}</span>
+                <button
+                  onClick={removeAttachment}
+                  className="text-sm text-gray-500 hover:text-red-400"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             className="mt-4 w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-white font-medium py-3 rounded-lg transition-colors"

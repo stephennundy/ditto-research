@@ -359,7 +359,7 @@ export default function Home() {
     setPollProgress({ responded: 0, total: 0 });
   };
 
-  const togglePersona = (id: string) => {
+  const togglePersona = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
